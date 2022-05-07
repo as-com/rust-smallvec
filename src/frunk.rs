@@ -10,6 +10,7 @@ where
     [Target; M]: Array<Item = Target>,
     [Source; N]: Array<Item = Source>,
 {
+    #[inline(always)]
     fn transmogrify(self) -> SmallVec<[Target; M]> {
         self.value.into_iter().map(|e| e.transmogrify()).collect()
     }
@@ -23,6 +24,7 @@ where
     [Target; M]: Array<Item = Target>,
     [Source; N]: Array<Item = Source>,
 {
+    #[inline(always)]
     fn transmogrify(self) -> SmallVec<[Target; M]> {
         self.into_iter().map(|e| e.transmogrify()).collect()
     }
