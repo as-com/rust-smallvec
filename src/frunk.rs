@@ -14,3 +14,16 @@ where
         self.value.into_iter().map(|e| e.transmogrify()).collect()
     }
 }
+
+impl<Source, Target, InnerIndices, const M: usize, const N: usize>
+    Transmogrifier<SmallVec<[Target; M]>, MappingIndicesWrapper<InnerIndices>>
+    for SmallVec<[Source; N]>
+where
+    Source: Transmogrifier<Target, InnerIndices>,
+    [Target; M]: Array<Item = Target>,
+    [Source; N]: Array<Item = Source>,
+{
+    fn transmogrify(self) -> SmallVec<[Target; M]> {
+        self.into_iter().map(|e| e.transmogrify()).collect()
+    }
+}
