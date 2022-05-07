@@ -1662,6 +1662,9 @@ mod specialization;
 #[cfg(feature = "arbitrary")]
 mod arbitrary;
 
+#[cfg(feature = "frunk")]
+mod frunk;
+
 #[cfg(feature = "specialization")]
 impl<'a, A: Array> SpecFrom<A, &'a [A::Item]> for SmallVec<A>
 where
