@@ -2,44 +2,50 @@ name: CI
 
 on:
   push:
-    branches: [auto]
+    branches: [v1]
   pull_request:
   workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
 
 jobs:
-  linux-ci:
-    name: Linux
-    runs-on: ubuntu-latest
+  ci:
+    name: Build/Test
     strategy:
       matrix:
         toolchain: ["stable", "beta", "nightly", "1.36.0"]
+        os: [ubuntu-latest]
         include:
           - toolchain: stable
-            env:
-              DO_FUZZ: 1
+            fuzz: 1
           - toolchain: beta
-            env:
-              DO_FUZZ: 1
-    steps:
-      - uses: actions/checkout@v2
+            fuzz: 1
+          - os: windows-latest
+            toolchain: nightly
 
-      - name: Install packages
-        run: sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc libiberty-dev
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install packages for fuzzing
+        if: runner.os == 'Linux' && matrix.fuzz == 1
+        run: sudo apt-get update -y && sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc libiberty-dev
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.toolchain }}
-          override: true
 
       - name: Cargo build
         run: cargo build --verbose
 
       - name: Cargo test
+        if: matrix.toolchain != '1.36.0'
         run: cargo test --verbose
 
       - name: Cargo test w/ serde
+        if: matrix.toolchain != '1.36.0'
         run: cargo test --verbose --features serde
 
       - name: Cargo check w/o default features
@@ -50,6 +56,14 @@ jobs:
         if: matrix.toolchain == 'beta'
         run: cargo test --verbose --features union
 
+      - name: Cargo test w/ debugger_visualizer
+        if: matrix.toolchain == 'nightly'
+        run: cargo test --test debugger_visualizer --verbose --features debugger_visualizer -- --test-threads=1
+
+      - name: Cargo test w/ debugger_visualizer and union
+        if: matrix.toolchain == 'nightly'
+        run: cargo test --test debugger_visualizer --verbose --features 'debugger_visualizer,union' -- --test-threads=1
+
       - name: Cargo test all features
         if: matrix.toolchain == 'nightly'
         run: cargo test --verbose --all-features
@@ -59,21 +73,21 @@ jobs:
         run: cargo bench --verbose bench
 
       - name: miri
-        if: matrix.toolchain == 'nightly'
+        if: matrix.toolchain == 'nightly' && matrix.os == 'ubuntu-latest'
         run: bash ./scripts/run_miri.sh
         env:
           MIRIFLAGS: '-Zmiri-tag-raw-pointers'
 
       - name: fuzz
-        if: env.DO_FUZZ == '1'
+        if: matrix.fuzz == 1
         working-directory: fuzz
-        run: ./travis_fuzz.sh
+        run: ./travis-fuzz.sh
 
   build_result:
-    name: homu build finished
+    name: Result
     runs-on: ubuntu-latest
     needs:
-      - "linux-ci"
+      - "ci"
 
     steps:
       - name: Mark the job as successful
@@ -82,4 +96,3 @@ jobs:
       - name: Mark the job as unsuccessful
         run: exit 1
         if: "!success()"
-
